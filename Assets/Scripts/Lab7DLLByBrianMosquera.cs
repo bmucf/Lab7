@@ -2,45 +2,90 @@ using UnityEngine;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-public class Lab7DLLByBrianMosquera : MonoBehaviour
+public class Lab7DLLBenchmark : MonoBehaviour
 {
-    // The imported function
+    // Native DLL import
     [DllImport("Lab7DLLByBrianMosquera", EntryPoint = "TestSort")]
     public static extern void TestSort(int[] a, int length);
 
-    public int[] numbers = new int[10000];
-    public int randomNumber;
-    public int currentElement = 0;
+    public int[] originalArray;
+    public int arraySize = 10000;
+    public int trials = 10;
 
     void Start()
     {
+        // Generate base array
+        originalArray = GenerateRandomArray(arraySize);
 
-        MeasureFunctionExecutionTime();
-
-        foreach (int number in numbers)
-        {
-            randomNumber = Random.Range(100000, 100000000);
-            numbers.SetValue(randomNumber, currentElement);
-            currentElement++;
-        }
-
-        TestSort(numbers, numbers.Length);
+        // Run benchmark
+        BenchmarkSorts(originalArray, trials);
     }
 
-    void MeasureFunctionExecutionTime()
+    // Generate random array
+    int[] GenerateRandomArray(int size)
+    {
+        int[] array = new int[size];
+        for (int i = 0; i < size; i++)
+        {
+            array[i] = Random.Range(100000, 100000000);
+        }
+        return array;
+    }
+
+    // Managed sort using built-in Array.Sort
+    void ManagedSort(int[] array)
+    {
+        System.Array.Sort(array);
+    }
+
+    // Benchmark both sorts
+    void BenchmarkSorts(int[] baseArray, int trialCount)
     {
         Stopwatch stopwatch = new Stopwatch();
+        long managedTotal = 0;
+        long nativeTotal = 0;
 
-        stopwatch.Start(); // Start timing
-        MyFunctionToTest(); // Call the function you want to measure
-        stopwatch.Stop();  // Stop timing
+        for (int t = 0; t < trialCount; t++)
+        {
+            int[] managedArray = (int[])baseArray.Clone();
+            int[] nativeArray = (int[])baseArray.Clone();
 
-        // Get the elapsed time
-        long elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-        UnityEngine.Debug.Log($"MyFunctionToTest took {elapsedMilliseconds} ms to execute.");
+            // Managed
+            stopwatch.Restart();
+            ManagedSort(managedArray);
+            stopwatch.Stop();
+            managedTotal += stopwatch.ElapsedMilliseconds;
+
+            // Native
+            stopwatch.Restart();
+            TestSort(nativeArray, nativeArray.Length);
+            stopwatch.Stop();
+            nativeTotal += stopwatch.ElapsedMilliseconds;
+        }
+
+        float managedAvg = managedTotal / (float)trialCount;
+        float nativeAvg = nativeTotal / (float)trialCount;
+
+        UnityEngine.Debug.Log("Managed sort average over " + trialCount + " trials: " + managedAvg + " ms");
+        UnityEngine.Debug.Log("Native sort average over " + trialCount + " trials: " + nativeAvg + " ms");
+
+        ComparePerformance(managedAvg, nativeAvg);
     }
-    void MyFunctionToTest()
+
+    // Compare and comment
+    void ComparePerformance(float managed, float native)
     {
-        TestSort(numbers, numbers.Length); //Make sure you have the code that imports your native DLL and populates the array somewhere
+        if (native < managed)
+        {
+            UnityEngine.Debug.Log("Native sort is faster by " + (managed - native) + " ms on average.");
+        }
+        else if (managed < native)
+        {
+            UnityEngine.Debug.Log("Managed sort is faster by " + (native - managed) + " ms on average.");
+        }
+        else
+        {
+            UnityEngine.Debug.Log("Both sorts performed equally on average.");
+        }
     }
 }
